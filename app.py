@@ -15,7 +15,7 @@ from script import (
 )
 
 app = Flask(__name__)
-CORS(app)  # Permite requisições do frontend
+CORS(app, origins=["https://spotyload-frontend-flask.vercel.app"])
 
 @app.route("/api/playlist", methods=["POST"])
 def get_playlist():
@@ -55,7 +55,7 @@ def get_playlist():
         print(f"[DEBUG] YouTube URL para '{track}': {url}")
         return idx, {"title": track, "youtubeUrl": url}
 
-    with ThreadPoolExecutor(max_workers=min(50, len(tracks))) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(process_track, i, trk) for i, trk in enumerate(tracks)]
         for f in as_completed(futures):
             idx, data_item = f.result()
