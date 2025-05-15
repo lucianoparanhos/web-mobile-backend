@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify  # Importa o Flask para criar a aplicação e os módulos para tratar requisições
 from flask_cors import CORS  # Importa CORS para permitir requisições de diferentes origens
 from script import extract_id, spotify_auth, get_spotify_name, get_spotify_items, search_youtube  # Importa as funções do script.py
@@ -56,5 +57,6 @@ def get_playlist():
 
     return jsonify({"name": playlist_name, "tracks": result})  # Retorna o nome da playlist e os links do YouTube das músicas
 
-if __name__ == "__main__":  # Se o script for executado diretamente
-    app.run(debug=True, port=3001)  # Inicia o servidor Flask na porta 3001
+if __name__ == "__main__": 
+    port = int(os.environ.get("PORT", 3001))  # Usa a porta da variável de ambiente ou 3001 como padrão local
+    app.run(debug=True, host="0.0.0.0", port=port)  # Escuta em todas as interfaces
