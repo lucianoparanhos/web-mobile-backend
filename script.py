@@ -85,6 +85,7 @@ def search_youtube(query):
             'skip_download': True,  # Não baixa o vídeo, apenas busca informações
             'default_search': 'ytsearch1',  # Realiza a pesquisa diretamente no YouTube
             'noplaylist': True,  # Impede a busca de playlists
+            'cookiefile': 'cookies.txt',  # Usa o arquivo de cookies para autenticação e evitar problemas com o bot do youtube
         }
 
         # Usa yt-dlp para buscar o vídeo
