@@ -1,62 +1,71 @@
 import os
-from flask import Flask, request, jsonify  # Importa o Flask para criar a aplicação e os módulos para tratar requisições
-from flask_cors import CORS  # Importa CORS para permitir requisições de diferentes origens
-from script import extract_id, spotify_auth, get_spotify_name, get_spotify_items, search_youtube  # Importa as funções do script.py
-import time  # Importa o módulo de tempo para medir o tempo de execução
-from concurrent.futures import ThreadPoolExecutor, as_completed  # Importa o executor de threads para executar tarefas em paralelo
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from script import extract_id, spotify_auth, get_spotify_name, get_spotify_items, search_youtube
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-app = Flask(__name__)  # Cria uma instância da aplicação Flask
-CORS(app)  # Habilita CORS para permitir que o frontend faça requisições para o backend
+# 🛠️ Reconstrói o cookies.txt a partir da variável de ambiente
+def write_cookies_file():
+    cookies = os.environ.get("COOKIES_TXT")
+    if cookies:
+        with open("cookies.txt", "w", encoding="utf-8") as f:
+            f.write(cookies)
+        print("[COOKIES] cookies.txt reconstruído com sucesso.")
+    else:
+        print("[COOKIES] Variável COOKIES_TXT não encontrada. cookies.txt não foi criado.")
 
-@app.route('/api/playlist', methods=['POST'])  # Define uma rota para o endpoint /api/playlist com método POST
+# 🔧 Reconstrói o arquivo logo no início da aplicação
+write_cookies_file()
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/api/playlist', methods=['POST'])
 def get_playlist():
-    inicio_total = time.time()  # Marca o tempo de início da requisição
-    data = request.get_json()  # Obtém os dados em formato JSON da requisição
-    link = data.get('link')  # Obtém o link da playlist
+    inicio_total = time.time()
+    data = request.get_json()
+    link = data.get('link')
 
-    if not link:  # Se o link não for fornecido
-        return jsonify({"error": "Nenhum link fornecido"}), 400  # Retorna um erro
+    if not link:
+        return jsonify({"error": "Nenhum link fornecido"}), 400
 
     print(f"[INÍCIO] Processando link da playlist: {link}")
 
-    # Autenticação no Spotify
     inicio_auth = time.time()
-    spotify = spotify_auth()  # Realiza a autenticação no Spotify
+    spotify = spotify_auth()
     print(f"[SPOTIFY AUTH] Tempo de autenticação: {time.time() - inicio_auth:.2f} segundos")
 
-    # Busca as músicas e nome da playlist
     inicio_spotify = time.time()
-    type_id, item_id = extract_id(link)  # Extrai o tipo e ID do link
-    if not type_id or type_id != 'playlist':  # Se o tipo não for válido ou não for uma playlist
-        return jsonify({"error": "Link inválido ou não é uma playlist"}), 400  # Retorna um erro
+    type_id, item_id = extract_id(link)
+    if not type_id or type_id != 'playlist':
+        return jsonify({"error": "Link inválido ou não é uma playlist"}), 400
 
-    tracks = get_spotify_items(spotify, type_id, item_id)  # Obtém as faixas da playlist
-    playlist_name = get_spotify_name(spotify, type_id, item_id)  # Obtém o nome da playlist
+    tracks = get_spotify_items(spotify, type_id, item_id)
+    playlist_name = get_spotify_name(spotify, type_id, item_id)
     print(f"[SPOTIFY DATA] Tempo para buscar nome e músicas: {time.time() - inicio_spotify:.2f} segundos")
 
-    # Busca os links no YouTube com paralelismo
     inicio_youtube = time.time()
-    result = [None] * len(tracks)  # Lista para armazenar os resultados das músicas
+    result = [None] * len(tracks)
 
-    def process_track(index, track):  # Função para processar cada música e buscar seu link no YouTube
-        yt_start = time.time()  # Marca o tempo de início da busca do YouTube
-        youtube_url = search_youtube(track)  # Busca o link no YouTube
-        duration = time.time() - yt_start  # Calcula a duração da busca
+    def process_track(index, track):
+        yt_start = time.time()
+        youtube_url = search_youtube(track)
+        duration = time.time() - yt_start
         print(f"[YOUTUBE] ({index + 1}/{len(tracks)}) '{track}' → {duration:.2f} segundos")
-        return index, {"title": track, "youtubeUrl": youtube_url}  # Retorna o índice da música e o link do YouTube
+        return index, {"title": track, "youtubeUrl": youtube_url}
 
-    # Executa as buscas do YouTube em paralelo para cada música
     with ThreadPoolExecutor(max_workers=min(50, len(tracks))) as executor:
-        futures = [executor.submit(process_track, i, track) for i, track in enumerate(tracks)]  # Cria as tarefas para as threads
-        for future in as_completed(futures):  # Quando uma tarefa for completada
-            index, data = future.result()  # Obtém o resultado da tarefa
-            result[index] = data  # Preserva a ordem das músicas original
+        futures = [executor.submit(process_track, i, track) for i, track in enumerate(tracks)]
+        for future in as_completed(futures):
+            index, data = future.result()
+            result[index] = data
 
     print(f"[YOUTUBE] Tempo total paralelo: {time.time() - inicio_youtube:.2f} segundos")
     print(f"[TOTAL] Tempo total da requisição: {time.time() - inicio_total:.2f} segundos")
 
-    return jsonify({"name": playlist_name, "tracks": result})  # Retorna o nome da playlist e os links do YouTube das músicas
+    return jsonify({"name": playlist_name, "tracks": result})
 
-if __name__ == "__main__": 
-    port = int(os.environ.get("PORT", 3001))  # Usa a porta da variável de ambiente ou 3001 como padrão local
-    app.run(debug=True, host="0.0.0.0", port=port)  # Escuta em todas as interfaces
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 3001))
+    app.run(debug=True, host="0.0.0.0", port=port)
